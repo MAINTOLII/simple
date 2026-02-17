@@ -4,7 +4,8 @@ export type Sale = {
   total: number;
   profit: number;
   date: string;
-  type: "cash" | "credit";
+  type: "cash" | "credit" | "shs";
+  shsAmount?: number;
   customer?: string;
 };
 

@@ -1,4 +1,3 @@
-import React from "react";
 
 type CartItem = {
   id: number;

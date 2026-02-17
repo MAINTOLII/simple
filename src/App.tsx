@@ -2,23 +2,8 @@ import { useState } from "react";
 import Credits from "./Credits";
 import Reports from "./Reports";
 import Sales from "./Sales";
+import type { Sale, CreditAccount } from "./types";
 
-type Sale = {
-  id: number;
-  items: any[];
-  total: number;
-  profit: number;
-  date: string;
-  type: "cash" | "credit";
-  customer?: string;
-};
-
-type CreditAccount = {
-  phone: string;
-  sales: Sale[];
-  payments: number[];
-  manualCredits: { amount: number; note: string; date: string }[];
-};
 
 function App() {
   const [page, setPage] = useState<"sales" | "reports" | "credits">("sales");
@@ -71,35 +56,6 @@ function App() {
     });
   };
 
-  const generateCreditInvoice = (account: CreditAccount) => {
-    const salesTotal = account.sales.reduce((s, sale) => s + sale.total, 0);
-    const manualTotal = (account.manualCredits || []).reduce(
-      (s, m) => s + m.amount,
-      0
-    );
-    const totalOwed = salesTotal + manualTotal;
-    const totalPaid = account.payments.reduce((s, p) => s + p, 0);
-    const balance = totalOwed - totalPaid;
-
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    win.document.write(`
-      <html>
-        <body style="font-family: Arial; background: white; padding: 30px;">
-          <h2>Credit Statement</h2>
-          <p><strong>Customer:</strong> ${account.phone}</p>
-          <hr />
-          <div><strong>Total Owed:</strong> $${totalOwed.toFixed(2)}</div>
-          <div><strong>Total Paid:</strong> $${totalPaid.toFixed(2)}</div>
-          <div><strong>Balance:</strong> $${balance.toFixed(2)}</div>
-        </body>
-      </html>
-    `);
-
-    win.document.close();
-  };
-
   return (
     <div
       style={{
@@ -128,7 +84,7 @@ function App() {
       </div>
 
       {page === "sales" && (
-        <Sales sales={sales} setSales={setSales} credits={credits} setCredits={setCredits} />
+        <Sales setSales={setSales} setCredits={setCredits} />
       )}
 
       {page === "reports" && (
@@ -140,7 +96,6 @@ function App() {
           credits={credits}
           addPayment={addPayment}
           addManualCredit={addManualCredit}
-          generateCreditInvoice={generateCreditInvoice}
         />
       )}
     </div>

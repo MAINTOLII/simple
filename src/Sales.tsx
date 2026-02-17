@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import type { Sale, CreditAccount } from "./types";
+
 type Product = {
   id: number;
   name: string;
@@ -17,35 +19,13 @@ type CartItem = {
   unit: "piece" | "kg";
 };
 
-type Sale = {
-  id: number;
-  items: CartItem[];
-  total: number;
-  profit: number;
-  date: string;
-  type: "cash" | "credit" | "shs";
-  customer?: string;
-  shsAmount?: number;
-};
-
-type CreditAccount = {
-  phone: string;
-  sales: Sale[];
-  payments: number[];
-  manualCredits: { amount: number; note: string; date: string }[];
-};
-
 type Props = {
-  sales: Sale[];
   setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
-  credits: CreditAccount[];
   setCredits: React.Dispatch<React.SetStateAction<CreditAccount[]>>;
 };
 
 export default function Sales({
-  sales,
   setSales,
-  credits,
   setCredits,
 }: Props) {
   const [products] = useState<Product[]>([
