@@ -152,6 +152,11 @@ export default function Reports() {
     0
   );
 
+  const totalSales = filteredSales.reduce(
+    (sum, sale) => sum + sale.total,
+    0
+  );
+
   const totalCreditPayments = filteredPayments.reduce(
     (sum, p) => sum + Number(p.amount),
     0
@@ -173,6 +178,9 @@ export default function Reports() {
       <h4>Sales & Payments</h4>
 
       <div style={{ marginBottom: 10 }}>
+        <strong>Total Sales:</strong>{" "}
+        ${totalSales.toFixed(2)}
+        <br />
         <strong>Total Profit:</strong>{" "}
         ${totalProfit.toFixed(2)}
         <br />
