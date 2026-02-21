@@ -74,3 +74,4 @@ export default defineConfig([
 # simple
 # newupdate
 # newupdate
+# simple
