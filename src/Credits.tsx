@@ -392,78 +392,84 @@ export default function Credits() {
               <div style={{ padding: "10px 12px" }}>
                 <div style={{ marginTop: 5 }}>
                   <button
-                    onClick={() => {
-                      const statementLines = [];
+                    onClick={async () => {
+                      const salesHtml = account.sales
+                        .map((sale) => {
+                          const itemsHtml = sale.items && sale.items.length > 0
+                            ? sale.items
+                                .map(
+                                  (item: any) =>
+                                    `<div style="margin-left:10px;font-size:13px;">• ${item.name} x${item.quantity} = $${(
+                                      item.price * item.quantity
+                                    ).toFixed(2)}</div>`
+                                )
+                                .join("")
+                            : "";
 
-                      statementLines.push("CREDIT STATEMENT");
-                      statementLines.push("----------------------------");
-                      statementLines.push("Phone: " + account.phone);
-                      statementLines.push("");
+                          return `
+                            <div style="margin-bottom:12px;">
+                              <div style="font-weight:600;">${sale.date}</div>
+                              <div>Total: $${sale.total.toFixed(2)}</div>
+                              ${itemsHtml}
+                            </div>
+                          `;
+                        })
+                        .join("");
 
-                      statementLines.push("SALES:");
-                      account.sales.forEach((sale) => {
-                        statementLines.push(
-                          `${sale.date}  |  Total: $${sale.total.toFixed(2)}`
-                        );
-
-                        if (sale.items && sale.items.length > 0) {
-                          sale.items.forEach((item: any) => {
-                            statementLines.push(
-                              `   - ${item.name} x${item.quantity} = $${(
-                                item.price * item.quantity
-                              ).toFixed(2)}`
-                            );
-                          });
-                        }
-
-                        statementLines.push("");
-                      });
-
-                      statementLines.push("");
-                      statementLines.push("MANUAL CREDITS:");
-                      (account.manualCredits || []).forEach((c) => {
-                        statementLines.push(
-                          `${c.date}  |  $${c.amount.toFixed(2)}  |  ${c.note}`
-                        );
-                      });
-
-                      statementLines.push("");
-                      statementLines.push("PAYMENTS:");
-                      payments
+                      const paymentsHtml = payments
                         .filter((p) => p.phone === account.phone)
-                        .forEach((p, i) => {
+                        .map((p) => {
                           const time = p.created_at
                             ? new Date(p.created_at).toLocaleString()
                             : "";
+                          return `<div style="margin-bottom:6px;">$${Number(p.amount).toFixed(2)} — ${time}</div>`;
+                        })
+                        .join("");
 
-                          statementLines.push(
-                            `Payment ${i + 1}  |  $${Number(p.amount).toFixed(2)}  |  ${time}`
-                          );
-                        });
+                      const html = `
+                        <html>
+                          <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1" />
+                            <title>Credit Statement</title>
+                          </head>
+                          <body style="font-family:Arial;background:#ffffff;color:#000;padding:16px;max-width:600px;margin:auto;">
+                            <h2 style="margin-bottom:8px;">Credit Statement</h2>
+                            <div style="margin-bottom:12px;"><strong>${displayLabel}</strong></div>
 
-                      statementLines.push("");
-                      statementLines.push(
-                        "TOTAL OWED: $" + totalOwed.toFixed(2)
-                      );
-                      statementLines.push(
-                        "TOTAL PAID: $" + totalPaid.toFixed(2)
-                      );
-                      statementLines.push(
-                        "BALANCE: $" + balance.toFixed(2)
-                      );
+                            <hr />
+                            <h4>Sales</h4>
+                            ${salesHtml || "<div>No sales recorded</div>"}
 
-                      const text = statementLines.join("\n");
+                            <hr />
+                            <h4>Manual Credits</h4>
+                            ${(account.manualCredits || [])
+                              .map(
+                                (c) =>
+                                  `<div style="margin-bottom:6px;">$${c.amount.toFixed(2)} — ${c.date}${c.note ? ` (${c.note})` : ""}</div>`
+                              )
+                              .join("") || "<div>No manual credits</div>"}
+
+                            <hr />
+                            <h4>Payments</h4>
+                            ${paymentsHtml || "<div>No payments recorded</div>"}
+
+                            <hr />
+                            <div style="font-size:15px;">
+                              <div><strong>Total Owed:</strong> $${totalOwed.toFixed(2)}</div>
+                              <div><strong>Total Paid:</strong> $${totalPaid.toFixed(2)}</div>
+                              <div><strong>Balance:</strong> $${balance.toFixed(2)}</div>
+                            </div>
+
+                            <br />
+                            <button onclick="window.print()" style="padding:10px 14px;margin-right:8px;">Print / Save PDF</button>
+                            <button onclick="navigator.clipboard.writeText(document.body.innerText)" style="padding:10px 14px;">Copy Text</button>
+                          </body>
+                        </html>
+                      `;
 
                       const newWindow = window.open("", "_blank");
                       if (!newWindow) return;
-
-                      newWindow.document.write(`
-                        <html>
-                          <body style="background:white;font-family:monospace;padding:20px;white-space:pre;">
-                            ${text}
-                          </body>
-                        </html>
-                      `);
+                      newWindow.document.write(html);
                       newWindow.document.close();
                     }}
                     style={{ marginRight: 10 }}
