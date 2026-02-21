@@ -236,7 +236,7 @@ export default function Sales({ setSales }: Props) {
     const newSale = createSale("cash", cleanCustomer);
     await reduceStockAndSync();
 
-    await supabase.from("sales").insert({
+    const { error } = await supabase.from("sales").insert({
       date: newSale.date,
       total: newSale.total,
       profit: newSale.profit,
@@ -246,7 +246,19 @@ export default function Sales({ setSales }: Props) {
       items: newSale.items,
     });
 
-    setSales((p) => [...p, newSale]);
+    if (error) {
+      alert("Failed to save sale to database");
+      console.error(error);
+      return;
+    }
+
+    const { data: refreshedSales } = await supabase
+      .from("sales")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (refreshedSales) setSales(refreshedSales as any);
+
     setCart([]);
     setLineTotals({});
     setCustomerInput("");
@@ -302,7 +314,7 @@ export default function Sales({ setSales }: Props) {
     const newSale = createSale("credit", cleanCustomer);
     await reduceStockAndSync();
 
-    await supabase.from("sales").insert({
+    const { error } = await supabase.from("sales").insert({
       date: newSale.date,
       total: newSale.total,
       profit: newSale.profit,
@@ -312,7 +324,19 @@ export default function Sales({ setSales }: Props) {
       items: newSale.items,
     });
 
-    setSales((p) => [...p, newSale]);
+    if (error) {
+      alert("Failed to save sale to database");
+      console.error(error);
+      return;
+    }
+
+    const { data: refreshedSales } = await supabase
+      .from("sales")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (refreshedSales) setSales(refreshedSales as any);
+
     setCart([]);
     setLineTotals({});
     setCustomerInput("");
@@ -332,7 +356,7 @@ export default function Sales({ setSales }: Props) {
     const newSale = createSale("shs", undefined, shsValue);
     await reduceStockAndSync();
 
-    await supabase.from("sales").insert({
+    const { error } = await supabase.from("sales").insert({
       date: newSale.date,
       total: newSale.total,
       profit: newSale.profit,
@@ -342,7 +366,19 @@ export default function Sales({ setSales }: Props) {
       items: newSale.items,
     });
 
-    setSales((p) => [...p, newSale]);
+    if (error) {
+      alert("Failed to save sale to database");
+      console.error(error);
+      return;
+    }
+
+    const { data: refreshedSales } = await supabase
+      .from("sales")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (refreshedSales) setSales(refreshedSales as any);
+
     setCart([]);
     setLineTotals({});
     localStorage.removeItem("mato_cart");
