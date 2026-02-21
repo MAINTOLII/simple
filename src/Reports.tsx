@@ -152,6 +152,11 @@ export default function Reports() {
     0
   );
 
+  // Fixed daily expenses (starts at -20)
+  const fixedExpenses = 20;
+
+  const netProfitAfterExpenses = totalProfit - fixedExpenses;
+
   const totalSales = filteredSales.reduce(
     (sum, sale) => sum + sale.total,
     0
@@ -197,6 +202,9 @@ export default function Reports() {
         <br />
         <strong>Total Profit:</strong>{" "}
         ${totalProfit.toFixed(2)}
+        <br />
+        <strong>Net Profit (After Expenses):</strong>{" "}
+        ${netProfitAfterExpenses.toFixed(2)}
         <br />
         <strong>Total Revenue (Cash):</strong>{" "}
         ${totalCashSales.toFixed(2)}
