@@ -64,6 +64,21 @@ export default function Logbook() {
     }
   };
 
+  const deleteEntry = async (entry: LogEntry) => {
+    const ok = window.confirm("Delete this log entry?");
+    if (!ok) return;
+
+    const { error } = await supabase.from("logbook").delete().eq("id", entry.id);
+
+    if (error) {
+      console.error(error);
+      window.alert("Failed to delete entry");
+      return;
+    }
+
+    setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+  };
+
   return (
     <div>
       <h3>Daily Log Book</h3>
@@ -94,9 +109,30 @@ export default function Logbook() {
 
       {entries.map((entry) => (
         <div key={entry.id} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "#555" }}>
-            {new Date(entry.created_at).toLocaleString()}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#555" }}>
+              {new Date(entry.created_at).toLocaleString()}
+            </div>
+
+            <button
+              onClick={() => deleteEntry(entry)}
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                cursor: "pointer",
+              }}
+            >
+              Delete
+            </button>
           </div>
+
           <div>{entry.text}</div>
         </div>
       ))}

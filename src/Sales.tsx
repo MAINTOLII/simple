@@ -43,6 +43,7 @@ export default function Sales({ setSales }: Props) {
     const saved = localStorage.getItem("mato_line_totals");
     return saved ? JSON.parse(saved) : {};
   });
+  const [lockedPrices, setLockedPrices] = useState<Record<string, boolean>>({});
   useEffect(() => {
     localStorage.setItem("mato_cart", JSON.stringify(cart));
   }, [cart]);
@@ -132,8 +133,25 @@ export default function Sales({ setSales }: Props) {
       prev.map((i) => {
         if (i.id !== id) return i;
         if (value === "") return { ...i, quantity: 0 };
+
         const quantity = parseFloat(value);
         if (isNaN(quantity)) return i;
+
+        const manualLine = lineTotals[id];
+
+        // If line total exists → recalc unit price, unless locked for kg
+        if (
+          manualLine !== undefined &&
+          manualLine !== "" &&
+          !(lockedPrices[id] && i.unit === "kg")
+        ) {
+          const lineTotal = parseFloat(manualLine);
+          if (!isNaN(lineTotal) && quantity > 0) {
+            const newPrice = lineTotal / quantity;
+            return { ...i, quantity, price: parseFloat(newPrice.toFixed(2)) };
+          }
+        }
+
         return { ...i, quantity };
       })
     );
@@ -144,9 +162,22 @@ export default function Sales({ setSales }: Props) {
       prev.map((i) => {
         if (i.id !== id) return i;
         if (value === "") return { ...i, price: 0 };
+
         const price = parseFloat(value);
         if (isNaN(price)) return i;
-        return { ...i, price };
+
+        const manualLine = lineTotals[id];
+
+        // If line total exists → recalc quantity
+        if (manualLine !== undefined && manualLine !== "") {
+          const lineTotal = parseFloat(manualLine);
+          if (!isNaN(lineTotal) && price > 0) {
+            const newQty = lineTotal / price;
+            return { ...i, price: parseFloat(price.toFixed(2)), quantity: parseFloat(newQty.toFixed(3)) };
+          }
+        }
+
+        return { ...i, price: parseFloat(price.toFixed(2)) };
       })
     );
   };
@@ -157,13 +188,29 @@ export default function Sales({ setSales }: Props) {
     setCart((prev) =>
       prev.map((i) => {
         if (i.id !== id) return i;
-        if (value === "") return { ...i, price: 0 };
+        if (value === "") return i;
 
         const lineTotal = parseFloat(value);
-        if (isNaN(lineTotal) || i.quantity <= 0) return i;
+        if (isNaN(lineTotal)) return i;
 
-        const newUnitPrice = lineTotal / i.quantity;
-        return { ...i, price: parseFloat(newUnitPrice.toFixed(2)) };
+        // LOCKED MODE (kg only)
+        if (lockedPrices[id] && i.unit === "kg" && i.price > 0) {
+          const newQty = lineTotal / i.price;
+          return { ...i, quantity: parseFloat(newQty.toFixed(3)) };
+        }
+
+        // NORMAL BEHAVIOUR
+        if (i.price > 0) {
+          const newQty = lineTotal / i.price;
+          return { ...i, quantity: parseFloat(newQty.toFixed(3)) };
+        }
+
+        if (i.quantity > 0) {
+          const newPrice = lineTotal / i.quantity;
+          return { ...i, price: parseFloat(newPrice.toFixed(2)) };
+        }
+
+        return i;
       })
     );
   };
@@ -183,6 +230,45 @@ export default function Sales({ setSales }: Props) {
     const match = input.match(/\((\d+)\)/);
     if (match) return match[1];
     return input.trim();
+  };
+
+  const normalizeAndEnsureCustomer = async (input: string) => {
+    let clean = input.trim();
+
+    // remove leading zeros
+    while (clean.startsWith("0")) {
+      clean = clean.slice(1);
+    }
+
+    // If numeric, ensure customer exists in DB
+    const numericPhone = clean ? Number(clean) : NaN;
+    const isNumeric = clean !== "" && !isNaN(numericPhone);
+
+    if (isNumeric) {
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("phone", numericPhone)
+        .maybeSingle();
+
+      if (!existingCustomer) {
+        await supabase.from("customers").insert({
+          id: numericPhone,
+          phone: numericPhone,
+          name: null,
+        });
+
+        setCustomers((prev) => [
+          ...prev,
+          { id: numericPhone, phone: numericPhone, name: null },
+        ]);
+      }
+
+      return { clean, numericPhone };
+    }
+
+    // Non-numeric entries are allowed, but won't be added to customers table
+    return { clean, numericPhone: null };
   };
 
   const profit = cart.reduce(
@@ -229,11 +315,15 @@ export default function Sales({ setSales }: Props) {
 
   const cashCheckout = async () => {
     if (!cart.length) return;
-    const cleanCustomer = customerInput
-      ? extractCustomerValue(customerInput)
-      : undefined;
+    let cleanCustomerForSale: string | undefined = undefined;
 
-    const newSale = createSale("cash", cleanCustomer);
+    if (customerInput.trim()) {
+      const raw = extractCustomerValue(customerInput);
+      const { clean } = await normalizeAndEnsureCustomer(raw);
+      cleanCustomerForSale = clean ? clean : undefined;
+    }
+
+    const newSale = createSale("cash", cleanCustomerForSale);
     await reduceStockAndSync();
 
     const { error } = await supabase.from("sales").insert({
@@ -275,43 +365,10 @@ export default function Sales({ setSales }: Props) {
       return;
     }
 
-    let cleanCustomer = extractCustomerValue(customerInput);
+    const raw = extractCustomerValue(customerInput);
+    const { clean } = await normalizeAndEnsureCustomer(raw);
 
-    // normalize phone (remove leading zero)
-    if (cleanCustomer.startsWith("0")) {
-      cleanCustomer = cleanCustomer.slice(1);
-    }
-
-    // ensure numeric
-    const numericPhone = Number(cleanCustomer);
-    if (isNaN(numericPhone)) {
-      alert("Customer phone must be a valid number.");
-      return;
-    }
-
-    // check if customer exists
-    const { data: existingCustomer } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("phone", numericPhone)
-      .maybeSingle();
-
-    // if not exists → create customer
-    if (!existingCustomer) {
-      await supabase.from("customers").insert({
-        id: numericPhone,
-        phone: numericPhone,
-        name: null,
-      });
-
-      // refresh local customers state
-      setCustomers((prev) => [
-        ...prev,
-        { id: numericPhone, phone: numericPhone, name: null },
-      ]);
-    }
-
-    const newSale = createSale("credit", cleanCustomer);
+    const newSale = createSale("credit", clean);
     await reduceStockAndSync();
 
     const { error } = await supabase.from("sales").insert({
@@ -319,7 +376,7 @@ export default function Sales({ setSales }: Props) {
       total: newSale.total,
       profit: newSale.profit,
       type: newSale.type,
-      customer: numericPhone.toString(),
+      customer: newSale.customer || null,
       shs_amount: null,
       items: newSale.items,
     });
@@ -485,20 +542,41 @@ export default function Sales({ setSales }: Props) {
               <div style={{ fontSize: 12 }}>Qty ({i.unit})</div>
               <input
                 type="number"
-                step={i.unit === "kg" ? "0.01" : "1"}
+                step={i.unit === "kg" ? "0.001" : "1"}
                 value={i.quantity === 0 ? "" : i.quantity}
                 onChange={(e) => updateQuantity(i.id, e.target.value)}
                 style={{ width: 80 }}
               />
             </div>
             <div>
-              <div style={{ fontSize: 12 }}>Unit Price ($)</div>
+              <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                Unit Price ($)
+                {i.unit === "kg" && (
+                  <span
+                    onClick={() =>
+                      setLockedPrices((prev) => ({
+                        ...prev,
+                        [i.id]: !prev[i.id],
+                      }))
+                    }
+                    style={{
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: lockedPrices[i.id] ? "gold" : "#888",
+                    }}
+                    title="Lock unit price"
+                  >
+                    ⚡
+                  </span>
+                )}
+              </div>
               <input
                 type="number"
                 step="0.01"
                 value={i.price === 0 ? "" : i.price}
                 onChange={(e) => updatePrice(i.id, e.target.value)}
                 style={{ width: 90 }}
+                disabled={lockedPrices[i.id] && i.unit === "kg"}
               />
             </div>
             <div>

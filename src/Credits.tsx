@@ -14,6 +14,8 @@ export default function Credits() {
     { id: number; name: string | null; phone: number }[]
   >([]);
   const [openAccount, setOpenAccount] = useState<string | null>(null);
+  const [editingPhone, setEditingPhone] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState<string>("");
 
 
   const filteredManualCustomers =
@@ -330,6 +332,7 @@ export default function Credits() {
         const displayLabel = matchedCustomer?.name
           ? `${account.phone} (${matchedCustomer.name})`
           : account.phone;
+        const isEditing = editingPhone === account.phone;
 
         const salesTotal = account.sales.reduce(
           (sum, sale) => sum + sale.total,
@@ -376,8 +379,69 @@ export default function Credits() {
                 backgroundColor: "#161616"
               }}
             >
-              <div style={{ fontSize: 14 }}>
-                <strong>{displayLabel}</strong>
+              <div style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                {!isEditing && (
+                  <>
+                    <strong>{displayLabel}</strong>
+                    <span
+                      style={{ cursor: "pointer", fontSize: 12, opacity: 0.6 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPhone(account.phone);
+                        setEditNameValue(matchedCustomer?.name || "");
+                      }}
+                    >
+                      ✏️
+                    </span>
+                  </>
+                )}
+
+                {isEditing && (
+                  <>
+                    <input
+                      value={editNameValue}
+                      onChange={(e) => setEditNameValue(e.target.value)}
+                      style={{
+                        fontSize: 13,
+                        padding: 4,
+                        borderRadius: 4,
+                        border: "1px solid #ccc",
+                        color: "black"
+                      }}
+                    />
+                    <button
+                      style={{ fontSize: 12 }}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+
+                        const numericPhone = Number(account.phone);
+                        if (isNaN(numericPhone)) return;
+
+                        const { error } = await supabase
+                          .from("customers")
+                          .update({ name: editNameValue || null })
+                          .eq("phone", numericPhone);
+
+                        if (error) {
+                          console.error(error);
+                          return;
+                        }
+
+                        setCustomers((prev) =>
+                          prev.map((c) =>
+                            c.phone === numericPhone
+                              ? { ...c, name: editNameValue || null }
+                              : c
+                          )
+                        );
+
+                        setEditingPhone(null);
+                      }}
+                    >
+                      Save
+                    </button>
+                  </>
+                )}
               </div>
               <div style={{ fontSize: 13 }}>
                 <span style={{ marginRight: 10 }}>
