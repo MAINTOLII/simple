@@ -22,19 +22,15 @@ type Sale = {
   customer?: string;
 };
 
-type CreditAccount = {
-  phone: string;
-  sales: Sale[];
-  payments: number[];
-  manualCredits: { amount: number; note: string; date: string }[];
-};
 
 
 export default function Reports() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const [credits, setCredits] = useState<CreditAccount[]>([]);
   const [payments, setPayments] = useState<
     { phone: string; amount: number; created_at?: string }[]
+  >([]);
+  const [customers, setCustomers] = useState<
+    { phone: number; name: string | null }[]
   >([]);
 
   useEffect(() => {
@@ -44,9 +40,6 @@ export default function Reports() {
         .select("*")
         .order("date", { ascending: false });
 
-      const { data: creditsData } = await supabase
-        .from("credit_accounts")
-        .select("*");
 
       const { data: paymentsData } = await supabase
         .from("credit_payments2")
@@ -67,9 +60,6 @@ export default function Reports() {
         );
       }
 
-      if (creditsData) {
-        setCredits(creditsData);
-      }
 
       if (paymentsData) {
         setPayments(
@@ -79,6 +69,14 @@ export default function Reports() {
             created_at: p.created_at,
           }))
         );
+      }
+
+      const { data: customersData } = await supabase
+        .from("customers")
+        .select("phone, name");
+
+      if (customersData) {
+        setCustomers(customersData);
       }
     };
 
@@ -167,14 +165,18 @@ export default function Reports() {
     0
   );
 
-  const getCustomerName = (phone: string) => {
-    const account = credits.find((c) => c.phone === phone);
-    if (!account) return null;
+  const getCustomerDisplay = (phone?: string) => {
+    if (!phone) return null;
 
-    // Look through ALL sales to find a stored customer name
-    const saleWithName = account.sales.find((s) => s.customer);
+    const match = customers.find(
+      (c) => c.phone.toString() === phone.toString()
+    );
 
-    return saleWithName?.customer || null;
+    if (match?.name) {
+      return `${match.name} (${phone})`;
+    }
+
+    return phone;
   };
 
   const deleteSale = async (id: number) => {
@@ -222,7 +224,7 @@ export default function Reports() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               {sale.date} ({sale.type === "shs" ? "SHS" : sale.type})
-              {sale.customer && ` — ${sale.customer}`}
+              {sale.customer && ` — ${getCustomerDisplay(sale.customer)}`}
             </div>
 
             <button
@@ -263,14 +265,13 @@ export default function Reports() {
 
       <h4>Credit Payments</h4>
       {filteredPayments.map((payment, idx) => {
-        const name = getCustomerName(payment.phone);
+        const display = getCustomerDisplay(payment.phone);
         return (
           <div
             key={`${payment.phone}-${idx}`}
             style={{ marginBottom: 6 }}
           >
-            {payment.phone}
-            {name && ` (${name})`} paid $
+            {display} paid $
             {Number(payment.amount).toFixed(2)}
           </div>
         );
