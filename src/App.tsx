@@ -4,10 +4,11 @@ import Reports from "./Reports";
 import Sales from "./Sales";
 import Edit from "./Edit";
 import Logbook from "./Logbook.tsx";
+import Qty from "./Qty";
 
 
 function App() {
-  const [page, setPage] = useState<"sales" | "reports" | "credits" | "logbook" | "edit-items">("sales");
+  const [page, setPage] = useState<"sales" | "reports" | "credits" | "logbook" | "edit-items" | "qty">("sales");
   const [, setSales] = useState<any[]>([]);
 
   return (
@@ -37,6 +38,7 @@ function App() {
         <button onClick={() => setPage("credits")}>Credits</button>
         <button onClick={() => setPage("logbook")}>Logbook</button>
         <button onClick={() => setPage("edit-items")}>Edit Items</button>
+        <button onClick={() => setPage("qty")}>Temporary</button>
       </div>
 
       {page === "sales" && (
@@ -57,6 +59,10 @@ function App() {
 
       {page === "edit-items" && (
         <Edit />
+      )}
+
+      {page === "qty" && (
+        <Qty />
       )}
     </div>
   );
