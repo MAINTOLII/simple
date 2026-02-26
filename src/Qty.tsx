@@ -65,7 +65,11 @@ export default function Qty() {
       const updated = [...products];
       updated[index] = form;
       setProducts(updated);
-      alert("Updated ✅");
+
+      // automatically go to next item if exists
+      if (index < updated.length - 1) {
+        goTo(index + 1);
+      }
     }
   };
 
@@ -169,7 +173,13 @@ export default function Qty() {
         }}
       >
         <button onClick={() => goTo(index - 1)}>⬅ Prev</button>
-        <button onClick={() => goTo(index + 1)}>Next ➡</button>
+        <button
+          onClick={async () => {
+            await saveChanges();
+          }}
+        >
+          Next ➡
+        </button>
       </div>
     </div>
   );
