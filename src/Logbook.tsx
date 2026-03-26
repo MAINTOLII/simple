@@ -60,6 +60,61 @@ export default function Logbook() {
         }),
       });
 
+      // Fetch all credit sales from today (5AM Nairobi time)
+      // Nairobi timezone offset is UTC+3
+      const now = new Date();
+      const utcYear = now.getUTCFullYear();
+      const utcMonth = now.getUTCMonth();
+      const utcDate = now.getUTCDate();
+
+      // Nairobi 5AM today in UTC
+      const nairobi5AMUtc = new Date(Date.UTC(utcYear, utcMonth, utcDate, 2, 0, 0)); // 5AM Nairobi = 2AM UTC
+
+      // If current time is before Nairobi 5AM, use previous day 5AM
+      if (now < nairobi5AMUtc) {
+        nairobi5AMUtc.setUTCDate(nairobi5AMUtc.getUTCDate() - 1);
+      }
+
+      // Fetch credit sales from 'sales' table with created_at >= nairobi5AMUtc and credit > 0
+      const { data: salesData, error: salesError } = await supabase
+        .from("sales")
+        .select("customer, credit")
+        .gte("created_at", nairobi5AMUtc.toISOString())
+        .gt("credit", 0);
+
+      if (salesError) {
+        console.error(salesError);
+      } else if (salesData && salesData.length > 0) {
+        // Calculate total credits per customer
+        const creditsPerCustomer: { [key: string]: number } = {};
+        salesData.forEach((sale: any) => {
+          const customer = sale.customer || "Unknown";
+          const credit = Number(sale.credit) || 0;
+          if (!creditsPerCustomer[customer]) {
+            creditsPerCustomer[customer] = 0;
+          }
+          creditsPerCustomer[customer] += credit;
+        });
+
+        // Format message
+        let creditMessage = `💳 Credit Sales Summary (from 5AM Nairobi):\n`;
+        for (const [customer, totalCredit] of Object.entries(creditsPerCustomer)) {
+          creditMessage += `- ${customer}: ${totalCredit.toFixed(2)}\n`;
+        }
+
+        // Send credit summary message to Telegram
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: creditMessage,
+          }),
+        });
+      }
+
       setInput("");
     }
   };

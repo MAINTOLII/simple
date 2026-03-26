@@ -53,15 +53,29 @@ export default function Credits() {
 
   useEffect(() => {
     const fetchCredits = async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("*")
-        .eq("type", "credit");
+      let allData: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
 
-      if (error) {
-        console.error(error);
-        return;
+      while (true) {
+        const { data, error } = await supabase
+          .from("sales")
+          .select("*")
+          .eq("type", "credit")
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        if (!data || data.length === 0) break;
+
+        allData = [...allData, ...data];
+        from += pageSize;
       }
+
+      const data = allData;
 
       if (data) {
         const grouped: Record<string, CreditAccount> = {};
@@ -80,7 +94,18 @@ export default function Credits() {
             };
           }
 
-          if (sale.items && sale.items.length === 0) {
+          let parsedItems = [];
+
+          try {
+            parsedItems =
+              typeof sale.items === "string"
+                ? JSON.parse(sale.items)
+                : sale.items || [];
+          } catch {
+            parsedItems = [];
+          }
+
+          if (!parsedItems || parsedItems.length === 0) {
             grouped[cleanPhone].manualCredits.push({
               amount: Number(sale.total),
               note: sale.note || "",
@@ -89,7 +114,7 @@ export default function Credits() {
           } else {
             grouped[cleanPhone].sales.push({
               id: sale.id,
-              items: sale.items || [],
+              items: parsedItems,
               total: Number(sale.total),
               profit: Number(sale.profit),
               date: sale.date,
@@ -97,6 +122,57 @@ export default function Credits() {
               customer: cleanPhone,
             });
           }
+        });
+
+        // Robust date parser for sorting
+        const parseDate = (d: string) => {
+          if (!d) return 0;
+
+          // Try native first
+          const native = new Date(d);
+          if (!isNaN(native.getTime())) return native.getTime();
+
+          const parts = d.split(",");
+          const datePart = parts[0]?.trim();
+          const timePart = parts[1]?.trim() || "00:00:00";
+
+          if (!datePart) return 0;
+
+          const nums = datePart.split(/[\/\-]/).map(Number);
+          if (nums.length !== 3) return 0;
+
+          let day = nums[0];
+          let month = nums[1];
+          let year = nums[2];
+
+          // 🔥 smarter detection
+          const hasAmPm = /am|pm/i.test(d);
+
+          if (hasAmPm) {
+            // assume US format if AM/PM exists → MM/DD/YYYY
+            month = nums[0];
+            day = nums[1];
+          } else if (nums[0] > 12) {
+            // definitely DD/MM/YYYY
+            day = nums[0];
+            month = nums[1];
+          } else if (nums[1] > 12) {
+            // definitely MM/DD/YYYY
+            month = nums[0];
+            day = nums[1];
+          } else {
+            // ambiguous → default to DD/MM (Somalia/UK style)
+            day = nums[0];
+            month = nums[1];
+          }
+
+          const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${timePart}`;
+          return new Date(iso).getTime();
+        };
+
+        Object.values(grouped).forEach((acc) => {
+          acc.sales.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+          acc.manualCredits.sort((a, b) => parseDate(b.date) - parseDate(a.date));
         });
 
         setCredits(Object.values(grouped));
@@ -216,7 +292,9 @@ export default function Credits() {
             const { data } = await supabase
               .from("sales")
               .select("*")
-              .eq("type", "credit");
+              .eq("type", "credit")
+              .order("date", { ascending: false })
+              .range(0, 5000);
 
             if (data) {
               const grouped: Record<string, CreditAccount> = {};
@@ -235,7 +313,18 @@ export default function Credits() {
                   };
                 }
 
-                if (sale.items && sale.items.length === 0) {
+                let parsedItems = [];
+
+                try {
+                  parsedItems =
+                    typeof sale.items === "string"
+                      ? JSON.parse(sale.items)
+                      : sale.items || [];
+                } catch {
+                  parsedItems = [];
+                }
+
+                if (!parsedItems || parsedItems.length === 0) {
                   grouped[cleanPhone].manualCredits.push({
                     amount: Number(sale.total),
                     note: sale.note || "",
@@ -244,7 +333,7 @@ export default function Credits() {
                 } else {
                   grouped[cleanPhone].sales.push({
                     id: sale.id,
-                    items: sale.items || [],
+                    items: parsedItems,
                     total: Number(sale.total),
                     profit: Number(sale.profit),
                     date: sale.date,
@@ -323,6 +412,16 @@ export default function Credits() {
             name.toLowerCase().includes(search.toLowerCase()) ||
             phoneStr.includes(search)
           );
+        })
+        .sort((a, b) => {
+          const getName = (acc: any) => {
+            const c = customers.find(
+              (x) => x.phone.toString() === acc.phone.toString()
+            );
+            return (c?.name || acc.phone || "").toLowerCase();
+          };
+
+          return getName(a).localeCompare(getName(b));
         })
         .map((account) => {
         const matchedCustomer = customers.find(
@@ -457,7 +556,65 @@ export default function Credits() {
                 <div style={{ marginTop: 5 }}>
                   <button
                     onClick={async () => {
-                      const salesHtml = account.sales
+                      // Improved robust date parser for sorting
+                      const parseDate = (d: string) => {
+                        if (!d) return 0;
+
+                        const parts = d.split(",");
+                        const datePart = parts[0]?.trim();
+                        const timePart = parts[1]?.trim() || "00:00:00";
+
+                        if (!datePart) return 0;
+
+                        const nums = datePart.split(/[\/\-]/).map(Number);
+                        if (nums.length !== 3) return 0;
+
+                        let day = nums[0];
+                        let month = nums[1];
+                        let year = nums[2];
+
+                        const hasAmPm = /am|pm/i.test(d);
+
+                        // STRONGER detection rules
+                        if (hasAmPm) {
+                          // US format → MM/DD/YYYY
+                          month = nums[0];
+                          day = nums[1];
+                        } else if (nums[0] > 12) {
+                          // DD/MM/YYYY
+                          day = nums[0];
+                          month = nums[1];
+                        } else if (nums[1] > 12) {
+                          // MM/DD/YYYY
+                          month = nums[0];
+                          day = nums[1];
+                        } else {
+                          // ⚠️ critical fix: check recent data pattern
+                          // If both <=12, assume DD/MM (your system default)
+                          day = nums[0];
+                          month = nums[1];
+                        }
+
+                        // Normalize time (handle PM manually if needed)
+                        let hours = 0, minutes = 0, seconds = 0;
+
+                        const timeMatch = timePart.match(/(\d+):(\d+):(\d+)/);
+                        if (timeMatch) {
+                          hours = Number(timeMatch[1]);
+                          minutes = Number(timeMatch[2]);
+                          seconds = Number(timeMatch[3]);
+                        }
+
+                        if (/pm/i.test(timePart) && hours < 12) hours += 12;
+                        if (/am/i.test(timePart) && hours === 12) hours = 0;
+
+                        return new Date(year, month - 1, day, hours, minutes, seconds).getTime();
+                      };
+                      const sortedSales = [...account.sales]
+                        .map(s => ({ ...s, _ts: parseDate(s.date) }))
+                        .sort((a, b) => b._ts - a._ts);
+
+                      const salesHtml = sortedSales
                         .map((sale) => {
                           const itemsHtml = sale.items && sale.items.length > 0
                             ? sale.items
@@ -490,6 +647,15 @@ export default function Credits() {
                         })
                         .join("");
 
+                      const manualCreditsHtml = [...(account.manualCredits || [])]
+                        .map(c => ({ ...c, _ts: parseDate(c.date) }))
+                        .sort((a, b) => b._ts - a._ts)
+                        .map(
+                          (c) =>
+                            `<div style="margin-bottom:6px;">$${c.amount.toFixed(2)} — ${c.date}${c.note ? ` (${c.note})` : ""}</div>`
+                        )
+                        .join("") || "<div>No manual credits</div>";
+
                       const html = `
                         <html>
                           <head>
@@ -506,12 +672,7 @@ export default function Credits() {
 
                             <hr />
                             <h4>Manual Credits</h4>
-                            ${(account.manualCredits || [])
-                              .map(
-                                (c) =>
-                                  `<div style="margin-bottom:6px;">$${c.amount.toFixed(2)} — ${c.date}${c.note ? ` (${c.note})` : ""}</div>`
-                              )
-                              .join("") || "<div>No manual credits</div>"}
+                            ${manualCreditsHtml}
 
                             <hr />
                             <h4>Payments</h4>
