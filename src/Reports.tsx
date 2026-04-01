@@ -38,7 +38,7 @@ export default function Reports() {
       const { data: salesData } = await supabase
         .from("sales")
         .select("*")
-        .order("date", { ascending: false });
+        .order("created_at", { ascending: false });
 
 
       const { data: paymentsData } = await supabase
@@ -82,62 +82,51 @@ export default function Reports() {
 
     fetchData();
   }, []);
-  const getBusinessStart = () => {
+
+
+  const getBusinessDayBounds = () => {
     const now = new Date();
-    const start = new Date();
+
+    const start = new Date(now);
     start.setHours(5, 0, 0, 0);
 
+    // if current time is before 5am, business day started yesterday 5am
     if (now.getHours() < 5) {
       start.setDate(start.getDate() - 1);
     }
 
-    return start;
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    return { start, end };
   };
 
-  const businessStart = getBusinessStart();
-
-  const parseSaleDate = (dateStr: string) => {
-    if (!dateStr) return null;
-
-    try {
-      // Normalize: remove comma and extra spaces
-      const clean = dateStr.replace(",", "").trim();
-
-      const [datePart, timePart] = clean.split(" ");
-
-      if (!datePart || !timePart) return null;
-
-      const [day, month, year] = datePart.split("/").map(Number);
-      const [hour, min, sec] = timePart.split(":").map(Number);
-
-      return new Date(year, month - 1, day, hour, min, sec);
-    } catch {
-      return null;
-    }
-  };
+  const { start: businessStart, end: businessEnd } = getBusinessDayBounds();
 
   const filteredSales = sales.filter((sale) => {
     let saleTime: Date | null = null;
 
     if (sale.created_at) {
-      saleTime = new Date(sale.created_at);
-    } else {
-      saleTime = parseSaleDate(sale.date);
+      const d = new Date(sale.created_at);
+      if (!isNaN(d.getTime())) {
+        saleTime = d;
+      }
     }
 
-    if (!saleTime) return true;
+    if (!saleTime) return false;
 
-    return saleTime >= businessStart;
+    return saleTime >= businessStart && saleTime < businessEnd;
   });
 
   const filteredPayments = payments.filter((p: any) => {
-    const paymentTime = p.created_at
-      ? new Date(p.created_at)
-      : null;
+    if (!p.created_at) return false;
 
-    if (!paymentTime) return false;
+    const d = new Date(p.created_at);
+    if (isNaN(d.getTime())) return false;
 
-    return paymentTime >= businessStart;
+    const paymentTime = new Date(d.getTime() + d.getTimezoneOffset() * -60000);
+
+    return paymentTime >= businessStart && paymentTime < businessEnd;
   });
 
   const totalCashSales = filteredSales

@@ -334,6 +334,7 @@ export default function Sales({ setSales }: Props) {
       customer: newSale.customer || null,
       shs_amount: null,
       items: newSale.items,
+      created_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -379,6 +380,7 @@ export default function Sales({ setSales }: Props) {
       customer: newSale.customer || null,
       shs_amount: null,
       items: newSale.items,
+      created_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -413,15 +415,16 @@ export default function Sales({ setSales }: Props) {
     const newSale = createSale("shs", undefined, shsValue);
     await reduceStockAndSync();
 
-    const { error } = await supabase.from("sales").insert({
-      date: newSale.date,
-      total: newSale.total,
-      profit: newSale.profit,
-      type: newSale.type,
-      customer: null,
-      shs_amount: newSale.shsAmount || null,
-      items: newSale.items,
-    });
+const { error } = await supabase.from("sales").insert({
+  date: new Date().toISOString(), // ✅ safe DB format
+  total: newSale.total,
+  profit: newSale.profit,
+  type: newSale.type,
+  customer: newSale.customer || null,
+  shs_amount: newSale.shsAmount || null,
+  items: newSale.items,
+  created_at: new Date().toISOString(),
+});
 
     if (error) {
       alert("Failed to save sale to database");
