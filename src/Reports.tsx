@@ -97,20 +97,23 @@ export default function Reports() {
   const businessStart = getBusinessStart();
 
   const parseSaleDate = (dateStr: string) => {
-    // Handles formats like "19/02/2026, 14:19:58"
     if (!dateStr) return null;
 
-    const [datePart, timePart] = dateStr.split(",");
-    if (!datePart || !timePart) return null;
+    try {
+      // Normalize: remove comma and extra spaces
+      const clean = dateStr.replace(",", "").trim();
 
-    const [day, month, year] = datePart.trim().split("/");
+      const [datePart, timePart] = clean.split(" ");
 
-    return new Date(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      ...timePart.trim().split(":").map(Number)
-    );
+      if (!datePart || !timePart) return null;
+
+      const [day, month, year] = datePart.split("/").map(Number);
+      const [hour, min, sec] = timePart.split(":").map(Number);
+
+      return new Date(year, month - 1, day, hour, min, sec);
+    } catch {
+      return null;
+    }
   };
 
   const filteredSales = sales.filter((sale) => {
@@ -122,7 +125,7 @@ export default function Reports() {
       saleTime = parseSaleDate(sale.date);
     }
 
-    if (!saleTime) return false;
+    if (!saleTime) return true;
 
     return saleTime >= businessStart;
   });
